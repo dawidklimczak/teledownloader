@@ -2,9 +2,11 @@ import streamlit as st
 import requests
 import zipfile
 import io
-import tempfile
 import os
 from urllib.parse import urlparse
+from bs4 import BeautifulSoup
+import re
+import unicodedata
 
 def is_valid_url(url):
     """Sprawdza czy podany string jest poprawnym URL."""
@@ -14,14 +16,28 @@ def is_valid_url(url):
     except:
         return False
 
-def get_filename_from_url(url):
-    """Generuje nazwę pliku na podstawie URL."""
+def sanitize_filename(title):
+    """Upraszcza tekst do bezpiecznej nazwy pliku."""
+    # Usuń polskie znaki
+    title = unicodedata.normalize('NFKD', title).encode('ASCII', 'ignore').decode('ASCII')
+    # Zamień spacje i inne znaki specjalne na podkreślenia
+    title = re.sub(r'[^\w\s-]', '', title)
+    title = re.sub(r'[-\s]+', '_', title)
+    # Przytnij długość
+    return title[:50].lower().strip('_')
+
+def get_page_title(html_content, url):
+    """Wyciąga tytuł strony z HTML."""
+    try:
+        soup = BeautifulSoup(html_content, 'html.parser')
+        title = soup.title.string if soup.title else None
+        if title:
+            return sanitize_filename(title)
+    except:
+        pass
+    # Jeśli nie udało się pobrać tytułu, użyj domyślnej nazwy z URL
     parsed = urlparse(url)
-    path = parsed.path.strip('/')
-    if not path:
-        path = 'index'
-    filename = path.replace('/', '_')
-    return f"{parsed.netloc}_{filename}.html"
+    return f"{parsed.netloc}_{parsed.path.strip('/').replace('/', '_') or 'index'}"
 
 def download_pages(urls):
     """Pobiera strony i zwraca je jako dict {nazwa_pliku: zawartość}."""
@@ -42,8 +58,14 @@ def download_pages(urls):
         try:
             response = requests.get(url, timeout=10)
             response.raise_for_status()
-            filename = get_filename_from_url(url)
+            
+            # Generuj nazwę pliku na podstawie tytułu strony
+            filename = get_page_title(response.text, url) + '.html'
             results[filename] = response.text
+            
+            # Wyświetl informację o pobranej stronie
+            st.info(f"Pobrano: {url} → {filename}")
+            
         except Exception as e:
             st.error(f"Błąd podczas pobierania {url}: {str(e)}")
             

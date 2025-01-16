@@ -1,1 +1,7 @@
 streamlit
+requests
+zipfile
+io
+tempfile
+os
+urlparse

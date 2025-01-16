@@ -1,7 +1,2 @@
-streamlit
-requests
-zipfile
-io
-tempfile
-os
-urlparse
+streamlit>=1.41.1
+requests>=2.31.0
